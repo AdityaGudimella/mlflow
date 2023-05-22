@@ -55,3 +55,5 @@ tiktoken
 tenacity
 # Required by mlflow.langchain
 langchain
+# Required by mlflow.semantic_kernel
+semantic_kernel
