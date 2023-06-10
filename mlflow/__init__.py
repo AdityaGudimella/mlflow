@@ -59,6 +59,7 @@ try:
     from mlflow import recipes
     from mlflow import pyfunc
     from mlflow import pytorch
+    from mlflow import semantic_kernel as semantic_kernel
     from mlflow import sklearn
     from mlflow import spacy
     from mlflow import spark
@@ -86,6 +87,7 @@ try:
         "onnx",
         "pyfunc",
         "pytorch",
+        "semantic_kernel",
         "sklearn",
         "spacy",
         "spark",

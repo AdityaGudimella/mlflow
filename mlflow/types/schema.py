@@ -62,6 +62,26 @@ class DataType(Enum):
     def get_spark_types(cls):
         return [dt.to_spark() for dt in cls._member_map_.values()]
 
+    @classmethod
+    def from_numpy_dtype(cls, dtype: np.dtype):
+        """Convert numpy dtype to DataType.
+
+        Args:
+            dtype: numpy dtype.
+
+        Returns:
+            DataType corresponding to the numpy dtype.
+
+        Raises:
+            MlflowException: If the numpy dtype is not supported.
+        """
+        for dt in cls._member_map_.values():
+            if np.issubdtype(dtype, dt.to_numpy()):
+                return dt
+        raise MlflowException(
+            f"Unsupported numpy dtype '{dtype}'. Expected one of {cls._member_map_.values()}"
+        )
+
 
 class ColSpec:
     """
