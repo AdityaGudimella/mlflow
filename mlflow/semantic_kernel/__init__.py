@@ -18,7 +18,6 @@ from pathlib import Path
 
 import pandas as pd
 import cloudpickle
-import json
 import numpy as np
 import yaml
 
@@ -298,38 +297,23 @@ def log_model(
     :return: A :py:class:`ModelInfo <mlflow.models.model.ModelInfo>` instance that contains the
              metadata of the logged model.
     """
-    import semantic_kernel
+    import semantic_kernel as sk
+    def _represent_sk(dumper, data):
+        """YAML representer for SK."""
+        print("AAAAAAAAAAA: ", data, type(data))
+        return dumper.represent_mapping("tag:yaml.org,2002:map", data.__dict__)
 
-    if not isinstance(
-        sk_model, (langchain.chains.llm.LLMChain, langchain.agents.agent.AgentExecutor)
-    ):
-        raise mlflow.MlflowException.invalid_parameter_value(
-            "MLflow langchain flavor only supports logging langchain.chains.llm.LLMChain and "
-            + f"langchain.agents.agent.AgentExecutor instances, found {type(sk_model)}"
-        )
 
-    _SUPPORTED_LLMS = {langchain.llms.openai.OpenAI, langchain.llms.huggingface_hub.HuggingFaceHub}
-    if (
-        isinstance(sk_model, langchain.chains.llm.LLMChain)
-        and type(sk_model.llm) not in _SUPPORTED_LLMS
-    ):
-        logger.warning(
-            "MLflow does not guarantee support for LLMChains outside of HuggingFaceHub and "
-            "OpenAI, found %s",
-            type(sk_model.llm).__name__,
-        )
+    class SKModel(Model):
+        """Override Model's `to_yaml` method to support YAML serialization of SK."""
+        def to_yaml(self, stream=None):
+            # Register YAML representer for SK
+            yaml.add_representer(sk.Kernel.__class__, _represent_sk)
+            # Use dump instead of safe_dump for now.
+            return yaml.dump(self.to_dict(), stream=stream, default_flow_style=False)
 
-    if (
-        isinstance(sk_model, langchain.agents.agent.AgentExecutor)
-        and type(sk_model.agent.llm_chain.llm) not in _SUPPORTED_LLMS
-    ):
-        logger.warning(
-            "MLflow does not guarantee support for LLMChains outside of HuggingFaceHub and "
-            "OpenAI, found %s",
-            type(sk_model.agent.llm_chain.llm).__name__,
-        )
 
-    return Model.log(
+    return SKModel.log(
         artifact_path=artifact_path,
         flavor=mlflow.semantic_kernel,
         registered_model_name=registered_model_name,
@@ -355,13 +339,11 @@ def _save_model(model, path):
     Raises:
         MlflowException: If the model is not a SemanticKernel Kernel.
     """
-    import semantic_kernel as sk
-
     model_data_path = Path(path) / _MODEL_DATA_FILE_NAME
     model_data_kwargs = {_MODEL_DATA_KEY: _MODEL_DATA_FILE_NAME}
 
     try:
-        model_data_path.write_bytes(sk.to_json(model))
+        model_data_path.write_bytes(cloudpickle.dumps(model))
     except (TypeError, NotImplementedError) as e:
         raise mlflow.MlflowException.invalid_parameter_value(
             "MLflow SemanticKernel flavor only supports saving Kernel "
@@ -425,13 +407,12 @@ def _load_model_from_local_fs(local_model_path: str):
     Returns:
         semantic_kernel.Kernel: The loaded model.
     """
-    import semantic_kernel as sk
     flavor_conf = _get_flavor_configuration(model_path=local_model_path, flavor_name=FLAVOR_NAME)
     _add_code_from_conf_to_system_path(local_model_path, flavor_conf)
     sk_model_path = os.path.join(
         local_model_path, flavor_conf.get(_MODEL_DATA_KEY, _MODEL_DATA_FILE_NAME)
     )
-    return sk.from_json(Path(sk_model_path).read_bytes())
+    return cloudpickle.loads(Path(sk_model_path).read_bytes())
 
 
 @experimental

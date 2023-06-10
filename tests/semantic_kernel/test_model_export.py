@@ -258,6 +258,21 @@ def model():
     return sk.Kernel()
 
 
+def test_native_log_and_load_model(model):
+    """I should be able to save and load SK models using mlflow."""
+    with mlflow.start_run():
+        logged_model = mlflow.semantic_kernel.log_model(
+            model, "temp_sk_model", registered_model_name="SemanticKernelModel"
+        )
+
+    loaded_model = mlflow.semantic_kernel.load_model(logged_model.model_uri)
+    assert "semantic_kernel" in logged_model.flavors
+    assert isinstance(loaded_model, type(model))
+    assert isinstance(loaded_model.memory, type(model.memory))
+    assert isinstance(loaded_model.prompt_template_engine, type(model.prompt_template_engine))
+    assert isinstance(loaded_model.skills, type(model.skills))
+
+
 def test_native_save_and_load_model(model, model_path: Path):
     """I should be able to save and load SK models using mlflow."""
     mlflow.semantic_kernel.save_model(model, model_path)
